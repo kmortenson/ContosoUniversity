@@ -21,10 +21,10 @@ namespace ContosoUniversity.Controllers
 
         // GET: Students
         public async Task<IActionResult> Index(
-     string sortOrder,
-     string currentFilter,
-     string searchString,
-     int? pageNumber)
+            string sortOrder,
+            string currentFilter,
+            string searchString,
+            int? pageNumber)
         {
             ViewData["CurrentSort"] = sortOrder;
             ViewData["NameSortParm"] = String.IsNullOrEmpty(sortOrder) ? "name_desc" : "";
@@ -68,6 +68,28 @@ namespace ContosoUniversity.Controllers
             return View(await PaginatedList<Student>.CreateAsync(students.AsNoTracking(), pageNumber ?? 1, pageSize));
         }
 
+        // GET: Students/Details/5
+        public async Task<IActionResult> Details(int? id)
+        {
+            if (id == null)
+            {
+                return NotFound();
+            }
+
+            var student = await _context.Students
+                 .Include(s => s.Enrollments)
+                     .ThenInclude(e => e.Course)
+                 .AsNoTracking()
+                 .FirstOrDefaultAsync(m => m.ID == id);
+
+            if (student == null)
+            {
+                return NotFound();
+            }
+
+            return View(student);
+        }
+
         // GET: Students/Create
         public IActionResult Create()
         {
@@ -80,7 +102,7 @@ namespace ContosoUniversity.Controllers
         [HttpPost]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> Create(
-    [Bind("EnrollmentDate,FirstMidName,LastName")] Student student)
+            [Bind("EnrollmentDate,FirstMidName,LastName")] Student student)
         {
             try
             {
@@ -175,16 +197,28 @@ namespace ContosoUniversity.Controllers
 
             return View(student);
         }
-
         // POST: Students/Delete/5
         [HttpPost, ActionName("Delete")]
         [ValidateAntiForgeryToken]
         public async Task<IActionResult> DeleteConfirmed(int id)
         {
             var student = await _context.Students.FindAsync(id);
-            _context.Students.Remove(student);
-            await _context.SaveChangesAsync();
-            return RedirectToAction(nameof(Index));
+            if (student == null)
+            {
+                return RedirectToAction(nameof(Index));
+            }
+
+            try
+            {
+                _context.Students.Remove(student);
+                await _context.SaveChangesAsync();
+                return RedirectToAction(nameof(Index));
+            }
+            catch (DbUpdateException /* ex */)
+            {
+                //Log the error (uncomment ex variable name and write a log.)
+                return RedirectToAction(nameof(Delete), new { id = id, saveChangesError = true });
+            }
         }
 
         private bool StudentExists(int id)
